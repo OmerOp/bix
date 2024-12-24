@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Bix - Your Voice Assistant</title>
+  <style>
+    /* Reset CSS */
+    body, html {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Arial', sans-serif;
+      background: radial-gradient(circle, #1c1c1c, #000000);
+      color: #ffffff;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    /* Container for the assistant */
+    .container {
+      text-align: center;
+      max-width: 600px;
+      width: 100%;
+    }
+
+    /* Assistant avatar with glowing circle */
+    .assistant {
+      margin-bottom: 20px;
+    }
+
+    .circle-container {
+      position: relative;
+      width: 220px;
+      height: 220px;
+      margin: 0 auto 10px;
+    }
+
+    .circle {
+      position: absolute;
+      top: 60%;
+      left: 50%;
+      width: 120px;
+      height: 120px;
+      background-color: #00a9e0;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 40px rgba(0, 169, 224, 0.7);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    /* Glowing pulse animation for the circle */
+    @keyframes pulse {
+      0% {
+        transform: translate(-50%, -50%) scale(1);
+        box-shadow: 0 0 40px rgba(0, 169, 224, 0.7);
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.05);
+        box-shadow: 0 0 80px rgba(0, 169, 224, 1);
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+        box-shadow: 0 0 40px rgba(0, 169, 224, 0.7);
+      }
+    }
+
+    /* Assistant response text */
+    .response {
+      font-size: 1.2em;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 10px;
+      border-radius: 10px;
+      line-height: 1.5;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-block;
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 1em;
+      font-weight: bold;
+      color: #121212;
+      background: #34ebba;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn:hover {
+      background: #4e78ed;
+      color: #ffffff;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .btn:disabled {
+      background: gray;
+      cursor: not-allowed;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="assistant">
+      <div class="circle-container">
+        <div class="circle"></div>
+      </div>
+      <div class="response" id="response">
+        Hello! I'm Bix, your voice assistant. How can I help you today?
+      </div>
+    </div>
+    <button id="start-btn" class="btn">🎙️ Start Listening</button>
+    <button id="stop-btn" class="btn hidden">⛔ Stop Listening</button>
+    <button id="stop-talk-btn" class="btn hidden">🛑 Stop Talk</button>
+    <button id="stop-music-btn" class="btn hidden">🛑 Stop Music</button>
+  </div>
+
+  <script src="https://code.responsivevoice.org/responsivevoice.js?key=unaTPkHE"></script>
+<script>
+  const startBtn = document.getElementById("start-btn");
+  const stopBtn = document.getElementById("stop-btn");
+  const stopTalkBtn = document.getElementById("stop-talk-btn");
+  const stopMusicBtn = document.getElementById("stop-music-btn");
+  const responseDiv = document.getElementById("response");
+
+  let isMusicPlaying = false;
+  let musicAudio = null;
+
+  // Speech recognition setup
+  const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+
+  // Start listening
+  startBtn.addEventListener("click", () => {
+    if (responsiveVoice.isPlaying()) {
+      responsiveVoice.cancel();
+      stopTalkBtn.classList.add("hidden");
+    }
+
+    responseDiv.textContent = "Listening...";
+    startBtn.classList.add("hidden");
+    stopBtn.classList.remove("hidden");
+    recognition.start();
+  });
+
+  // Stop listening
+  stopBtn.addEventListener("click", () => {
+    recognition.stop();
+    stopBtn.classList.add("hidden");
+    responseDiv.textContent = "Stopped listening.";
+    startBtn.classList.remove("hidden");
+  });
+
+  // Handle speech recognition results
+  recognition.addEventListener("result", async (event) => {
+    const userInput = event.results[0][0].transcript.toLowerCase();
+    responseDiv.textContent = `You: ${userInput}`;
+
+    if (userInput === "play music") {
+      playMusic();
+    } else {
+      const assistantResponse = await getResponse(userInput);
+      responseDiv.textContent = `Bix: ${assistantResponse}`;
+      speak(assistantResponse);
+    }
+  });
+
+  // Handle recognition end
+  recognition.addEventListener("end", () => {
+    stopBtn.classList.add("hidden");
+  });
+
+  // Fetch response from server
+  async function getResponse(userInput) {
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userInput }),
+      });
+
+      if (!response.ok) {
+        return "Sorry, something went wrong.";
+      }
+
+      const data = await response.json();
+      return data?.content || "Sorry, I couldn't understand.";
+    } catch (error) {
+      return "Something went wrong.";
+    }
+  }
+
+  // Speak text aloud using ResponsiveVoice
+  function speak(text) {
+    stopTalkBtn.classList.remove("hidden");
+    startBtn.classList.add("hidden");
+
+    responsiveVoice.speak(text, "UK English Male", {
+      rate: 1,
+      onend: () => {
+        stopTalkBtn.classList.add("hidden");
+        startBtn.classList.remove("hidden");
+      }
+    });
+  }
+
+  // Stop speaking when Stop Talk button is clicked
+  stopTalkBtn.addEventListener("click", () => {
+    responsiveVoice.cancel();
+    stopTalkBtn.classList.add("hidden");
+    startBtn.classList.remove("hidden"); // Show Start Listening button
+  });
+
+  // Function to play music
+  function playMusic() {
+    if (isMusicPlaying) return;
+
+    musicAudio = new Audio('https://cdn.glitch.global/5b2fab4d-0f08-413d-9df6-c499f0896fef/music.mp3?v=1734712725366');
+    musicAudio.play();
+    isMusicPlaying = true;
+    responseDiv.textContent = "Playing music...";
+
+    stopMusicBtn.classList.remove("hidden");
+    startBtn.classList.add("hidden");
+  }
+
+  // Stop music and refresh page
+  stopMusicBtn.addEventListener("click", () => {
+    if (musicAudio) {
+      musicAudio.pause();
+      musicAudio.currentTime = 0;
+      isMusicPlaying = false;
+      responseDiv.textContent = "Stopped music.";
+      location.reload();
+    }
+  });
+</script>
+</body>
+</html>
